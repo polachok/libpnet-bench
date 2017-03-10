@@ -8,6 +8,8 @@ extern crate byteorder;
 use test::Bencher;
 
 use pnet::packet::ipv4::Ipv4Packet;
+use pnet::packet::ethernet::EthernetPacket;
+
 use rand::{Rand,Rng};
 use std::io::{Seek,Cursor};
 use std::net::Ipv4Addr;
@@ -22,6 +24,10 @@ const PACKET: [u8; 60] = [
 		0x04, 0x02, 0x08, 0x0a, 0x05, 0x01, 0x45, 0x3b, 0x0, 0x0, 0x0,
 		0x0, 0x01, 0x03, 0x03, 0x07 ];
 
+
+const ETHER_PACKET: [u8; 14] = [
+		0xbc, 0x5f, 0xf4, 0x36, 0x5a, 0xbe, 0x68, 0x05, 0xca, 0x21, 0x58, 0x86, 0x08, 0x00
+];
 
 fn bytes_get_src_dst(bytes: &[u8]) -> (Ipv4Addr, Ipv4Addr) {
 	let mut buf: [u8; 4] = [0; 4];
@@ -123,6 +129,12 @@ impl PartialEq for MacAddr2 {
 	}
 }
 
+impl From<[u8; 6]> for MacAddr2 {
+	fn from(bytes: [u8; 6]) -> Self {
+		MacAddr2(bytes)
+	}
+}
+
 #[bench]
 fn compare_mac_addr_arr(b: &mut Bencher) {
 	let mut rng = rand::thread_rng();
@@ -174,5 +186,80 @@ fn compare_mac_addr_transmute(b: &mut Bencher) {
 		let rand_tuple: (u8, u8, u8, u8, u8, u8) = rng.gen();
 		let rand_mac = MacAddr3::new(tuple.0, tuple.1, tuple.2, tuple.3, tuple.4, tuple.5);
 		test::black_box(mac == rand_mac);
+	})
+}
+
+
+fn pnet_get_dest_mac(bytes: &[u8]) -> Option<MacAddr> {
+	if let Some(eth) = EthernetPacket::new(bytes) {
+		return Some(eth.get_destination());
+	}
+	None
+}
+
+#[bench]
+fn compare_mac_addr_from_packet_pnet(b: &mut Bencher) {
+	let mut rng = rand::thread_rng();
+
+	let tuple: (u8, u8, u8, u8, u8, u8) = rng.gen();
+	let my_mac = MacAddr::new(tuple.0, tuple.1, tuple.2, tuple.3, tuple.4, tuple.5);
+
+	b.iter(|| {
+		let mut bytes: [u8; 14] = rng.gen();
+		let mac = pnet_get_dest_mac(&bytes).unwrap();
+		test::black_box(mac == my_mac);
+	})
+}
+
+struct MacAddrBuf<'a>(&'a [u8]);
+
+impl<'a> PartialEq for MacAddrBuf<'a> {
+	fn eq(&self, other: &MacAddrBuf<'a>) -> bool {
+		self.0 == other.0
+	}	
+}
+
+fn slice_get_dest_mac(bytes: &[u8]) -> Option<MacAddrBuf> {
+	if bytes.len() >= 12 {
+		return Some(MacAddrBuf(&bytes[6..12]))
+	}
+	None
+}
+
+#[bench]
+fn compare_mac_addr_from_packet_slice(b: &mut Bencher) {
+	let mut rng = rand::thread_rng();
+
+	let tuple: [u8; 6] = rng.gen();
+	let my_mac = MacAddrBuf(&tuple);
+
+	b.iter(|| {
+		let mut bytes: [u8; 14] = rng.gen();
+		let mac = slice_get_dest_mac(&bytes).unwrap();
+		test::black_box(mac == my_mac);
+	})
+}
+
+
+fn bytes_get_dest_mac(bytes: &[u8]) -> Option<MacAddr2> {
+	if bytes.len() >= 12 {
+		let mut buf: [u8; 6] = unsafe { std::mem::uninitialized() };
+		(&mut buf).copy_from_slice(&bytes[6..12]);
+		return Some(MacAddr2::from(buf));
+	}
+	None
+}
+
+#[bench]
+fn compare_mac_addr_from_packet_bytes(b: &mut Bencher) {
+	let mut rng = rand::thread_rng();
+
+	let tuple: (u8, u8, u8, u8, u8, u8) = rng.gen();
+	let my_mac = MacAddr2::new(tuple.0, tuple.1, tuple.2, tuple.3, tuple.4, tuple.5);
+
+	b.iter(|| {
+		let mut bytes: [u8; 14] = rng.gen();
+		let mac = bytes_get_dest_mac(&bytes).unwrap();
+		test::black_box(mac == my_mac);
 	})
 }

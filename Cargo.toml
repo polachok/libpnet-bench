@@ -1,0 +1,14 @@
+[package]
+name = "libpnet-bench"
+version = "0.1.0"
+authors = ["Alexander Polyakov <apolyakov@beget.com>"]
+
+[dependencies]
+rand = "0.3"
+byteorder = "1.0"
+
+pnet = "0.16"
+#[dependencies.pnet]
+#git = "https://github.com/polachok/libpnet"
+#branch = "syncookied"
+#rev = "bea582dbb407862b05adabb25cf6392abfc0088f"
