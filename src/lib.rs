@@ -241,17 +241,14 @@ fn compare_mac_addr_from_packet_slice(b: &mut Bencher) {
 }
 
 
-fn bytes_get_dest_mac(bytes: &[u8]) -> Option<MacAddr2> {
-	if bytes.len() >= 12 {
-		let mut buf: [u8; 6] = unsafe { std::mem::uninitialized() };
-		(&mut buf).copy_from_slice(&bytes[6..12]);
-		return Some(MacAddr2::from(buf));
-	}
-	None
+fn bytes_get_dest_mac_2(bytes: &[u8]) -> MacAddr2 {
+	let mut mac: MacAddr2 = unsafe { std::mem::uninitialized() };
+	(&mut mac.0).copy_from_slice(&bytes[6..12]);
+	mac
 }
 
 #[bench]
-fn compare_mac_addr_from_packet_bytes(b: &mut Bencher) {
+fn compare_mac_addr_from_packet_bytes_2(b: &mut Bencher) {
 	let mut rng = rand::thread_rng();
 
 	let tuple: (u8, u8, u8, u8, u8, u8) = rng.gen();
@@ -259,7 +256,27 @@ fn compare_mac_addr_from_packet_bytes(b: &mut Bencher) {
 
 	b.iter(|| {
 		let mut bytes: [u8; 14] = rng.gen();
-		let mac = bytes_get_dest_mac(&bytes).unwrap();
+		let mac = bytes_get_dest_mac_2(&bytes);
+		test::black_box(mac == my_mac);
+	})
+}
+
+fn bytes_get_dest_mac_3(bytes: &[u8]) -> MacAddr3 {
+	let mut mac: MacAddr3 = unsafe { std::mem::uninitialized() };
+	(&mut mac.0).copy_from_slice(&bytes[6..12]);
+	mac
+}
+
+#[bench]
+fn compare_mac_addr_from_packet_bytes_3(b: &mut Bencher) {
+	let mut rng = rand::thread_rng();
+
+	let tuple: (u8, u8, u8, u8, u8, u8) = rng.gen();
+	let my_mac = MacAddr3::new(tuple.0, tuple.1, tuple.2, tuple.3, tuple.4, tuple.5);
+
+	b.iter(|| {
+		let mut bytes: [u8; 14] = rng.gen();
+		let mac = bytes_get_dest_mac_3(&bytes);
 		test::black_box(mac == my_mac);
 	})
 }
